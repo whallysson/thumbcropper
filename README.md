@@ -13,12 +13,12 @@ Ex.: http://seusite.com/upload/images/imagem.png?w=250&h=500&a=b&zc=2
 ##### Create thumbs
 ``` php
 $Tim = new Thumb('images_cache');
-echo $Tim->imgCreate(http://seusite.com/upload/images/imagem.png?w=250&h=500&a=b&zc=2);
+echo $Tim->imgCreate('http://seusite.com/upload/images/imagem.png?w=250&h=500&a=b&zc=2');
 ou
-echo $Tim->imgCreate(upload/images/imagem.png?w=250&h=500&a=b&zc=2);
+echo $Tim->imgCreate('upload/images/imagem.png?w=250&h=500&a=b&zc=2');
 
-echo "<img src='{$Tim->imgCreate(http://seusite.com/upload/images/imagem.png?w=250&h=500&a=b&zc=2)}' alt='New Image' title='New Image'>";
-echo "<img src='{$Tim->imgCreate(upload/images/imagem.png?w=250&h=500&a=b&zc=2)}' alt='New Image' title='New Image'>";
+echo "<img src='{$Tim->imgCreate('http://seusite.com/upload/images/imagem.png?w=250&h=500&a=b&zc=2')}' alt='New Image' title='New Image'>";
+echo "<img src='{$Tim->imgCreate('upload/images/imagem.png?w=250&h=500&a=b&zc=2')}' alt='New Image' title='New Image'>";
 ```
 
 ##### Clear cache
