@@ -9,11 +9,27 @@ Classe para imagens em miniatura
 
 ### Como usar
 Ex.: http://seusite.com/upload/images/imagem.png?w=250&h=500&a=b&zc=2
+
+##### Create thumbs
 ``` php
-$Tim = new AvelThumb;
-echo $Tim->ImgCreate(http://seusite.com/upload/images/imagem.png?w=250&h=500&a=b&zc=2);
+$Tim = new Thumb('images_cache');
+echo $Tim->imgCreate(http://seusite.com/upload/images/imagem.png?w=250&h=500&a=b&zc=2);
 ou
-echo $Tim->ImgCreate(upload/images/imagem.png?w=250&h=500&a=b&zc=2);
+echo $Tim->imgCreate(upload/images/imagem.png?w=250&h=500&a=b&zc=2);
+
+echo "<img src='{$Tim->imgCreate(http://seusite.com/upload/images/imagem.png?w=250&h=500&a=b&zc=2)}' alt='New Image' title='New Image'>";
+echo "<img src='{$Tim->imgCreate(upload/images/imagem.png?w=250&h=500&a=b&zc=2)}' alt='New Image' title='New Image'>";
+```
+
+##### Clear cache
+``` php
+$Tim = new Thumb('images_cache');
+
+//flush by filename
+$Tim->flush("images/image.jpg");
+
+//flush cache folder
+$Tim->flush();
 ```
 
 
