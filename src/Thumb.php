@@ -42,6 +42,7 @@ class Thumb {
     private $cacheFolder;
 
     /** PROPERTIES */
+
     /** @var string */
     private $wbase = 800; // Tamanho padrão da largura da imagem caso não seja setada
 
@@ -58,12 +59,12 @@ class Thumb {
     private $a;
 
     /** QUALITY */
+
     /** @var int */
     private $jpgQuality = 75; // 0 a 100
 
     /** @var int|null */
     private $pngCompressor = 5; // floor(95 * 0.09)
-
 
     /**
      * Thumb constructor.
@@ -74,10 +75,10 @@ class Thumb {
      * @throws \Exception
      */
     function __construct(
-        string $cacheFolder,
-        ?string $Time = null,
-        ?int $jpgQuality = null,
-        ?int $pngCompressor = null
+            string $cacheFolder,
+            ?string $Time = null,
+            ?int $jpgQuality = null,
+            ?int $pngCompressor = null
     ) {
         $this->cacheFolder = $cacheFolder;
         $this->time = ($Time ? $Time : $this->time);
@@ -86,14 +87,13 @@ class Thumb {
         $this->pngCompressor = $pngCompressor ? $pngCompressor : $this->pngCompressor;
 
         if (!file_exists($this->cacheFolder) || !is_dir($this->cacheFolder)) {
-            if (!mkdir($this->cacheFolder, 0755)) {
+            if (!mkdir($this->cacheFolder, 0755, true)) {
                 throw new \Exception("Could not create cache folder");
             }
         }
 
         $this->existeFileCache();
     }
-
 
     /**
      * @param string $imagePath
@@ -119,19 +119,20 @@ class Thumb {
         /** Arrow the name */
         $this->setFileName();
 
-
         if (file_exists("{$this->cacheFolder}/{$this->imageName}") && is_file("{$this->cacheFolder}/{$this->imageName}")) {
             /** Return the cached image if it already exists */
             return "{$this->cacheFolder}/{$this->imageName}";
         } else {
-            $this->properties();
-            $this->imgSize();
-
-            if (strstr($this->file["type"], 'image/')):
-                $this->uploadImage();
-                return $this->getResult();
-            endif;
+            $response = $this->setProps();
+            if (!empty($response)) {
+                return $response;
+            } else {
+                /** If the image does not exist it creates in the image in the cache folder */
+                $this->noImage('no_image');
+            }
         }
+
+        return null;
     }
 
     /**
@@ -169,12 +170,23 @@ class Thumb {
         return $this->error;
     }
 
-
     /**
      *
      */
-    private function noImage(): void {
-        if (empty($this->imageName)) {
+    private function setProps() {
+        $this->properties();
+        $this->imgSize();
+
+        if (strstr($this->file["type"], 'image/')) {
+            $this->uploadImage();
+            return $this->getResult();
+        }
+
+        return null;
+    }
+
+    private function noImage(string $no = null): void {
+        if (empty($this->imageName) || $no) {
             $fileName = 'no_image.jpg';
             $folderFileName = "{$this->cacheFolder}/{$fileName}";
             if (!file_exists($folderFileName)) {
@@ -193,7 +205,6 @@ class Thumb {
             $this->file['ext'] = mb_strtolower(strrchr($this->imageName, '.'));
         }
     }
-
 
     /**
      * @param string|null $imageName
@@ -217,7 +228,6 @@ class Thumb {
         }
     }
 
-
     /**
      *
      */
@@ -239,7 +249,6 @@ class Thumb {
             }
         }
     }
-
 
     /**
      *
@@ -273,9 +282,9 @@ class Thumb {
      */
     private function properties(): void {
         parse_str($this->file['query'], $prop);
-        $this->width = ((int)isset($prop['w']) ? $prop['w'] : null);
-        $this->height = ((int)isset($prop['h']) ? $prop['h'] : null);
-        $this->zc = ((int)isset($prop['zc']) ? $prop['zc'] : 1);
+        $this->width = ((int) isset($prop['w']) ? $prop['w'] : null);
+        $this->height = ((int) isset($prop['h']) ? $prop['h'] : null);
+        $this->zc = ((int) isset($prop['zc']) ? $prop['zc'] : 1);
         $this->a = (isset($prop['a']) ? $prop['a'] : 'c');
     }
 
@@ -396,7 +405,7 @@ class Thumb {
                 }
 
                 imagecopyresampled($NewImage, $this->image, $origin_x, $origin_y, $src_x, $src_y, $ImageX, $ImageH,
-                    $src_w, $src_h);
+                        $src_w, $src_h);
             } else {
                 imagecopyresampled($NewImage, $this->image, 0, 0, 0, 0, $ImageX, $ImageH, $x, $y);
             }
@@ -436,9 +445,10 @@ class Thumb {
         $formats = 'ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜüÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûýýþÿRr"!@#$%&*()_-+={[}]/?;:.,\\\'<>°ºª';
         $replace = 'aaaaaaaceeeeiiiidnoooooouuuuuybsaaaaaaaceeeeiiiidnoooooouuuyybyRr                                 ';
         $name = str_replace(["-----", "----", "---", "--"], "-",
-            str_replace(" ", "-", trim(strtr(utf8_decode($name), utf8_decode($formats), $replace))));
+                str_replace(" ", "-", trim(strtr(utf8_decode($name), utf8_decode($formats), $replace))));
 
         return $name;
     }
 
 }
+
