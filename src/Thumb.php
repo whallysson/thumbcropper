@@ -99,7 +99,7 @@ class Thumb {
      * @param string $imagePath
      * @return null|string
      */
-    public function imgCreate(string $imagePath): ?string {
+    public function imgCreate(string $imagePath, string $imageName = null): ?string {
         $this->url = $imagePath;
 
         $ParseUrl = parse_url($this->url);
@@ -117,7 +117,7 @@ class Thumb {
         $this->cleanCache();
 
         /** Arrow the name */
-        $this->setFileName();
+        $this->setFileName($imageName);
 
         if (file_exists("{$this->cacheFolder}/{$this->imageName}") && is_file("{$this->cacheFolder}/{$this->imageName}")) {
             /** Return the cached image if it already exists */
@@ -451,4 +451,3 @@ class Thumb {
     }
 
 }
-
