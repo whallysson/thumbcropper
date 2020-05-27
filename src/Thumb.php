@@ -130,6 +130,9 @@ class Thumb
             return "Image not found";
         }
 
+        /** set the properties in the image */
+        $this->properties();
+
         $this->imagePath = $ParseUrl['path'];
         $this->imageMime = mime_content_type($this->imagePath);
         $this->imageInfo = pathinfo($this->imagePath);
@@ -257,10 +260,14 @@ class Thumb
 
         $hash = $this->hash($this->imagePath);
         $ext = ($this->imageMime == "image/jpeg" ? ".jpg" : ".png");
-        $widthName = ($width ? "-{$width}" : "");
-        $heightName = ($height ? "x{$height}" : "");
 
-        return "{$name}{$widthName}{$heightName}-{$hash}{$ext}";
+        $widthName = ($width ? "-{$width}" : ($this->width ? "-{$this->width}" : ""));
+        $heightName = ($height ? "x{$height}" : ($this->height ? "x{$this->height}" : ""));
+
+        $zcName = ($this->zc ? "-{$this->zc}" : "");
+        $aName = ($this->a ? "-{$this->a}" : "");
+
+        return "{$name}{$widthName}{$heightName}{$zcName}{$aName}-{$hash}{$ext}";
     }
 
     /**
@@ -278,7 +285,6 @@ class Thumb
      */
     private function setProps()
     {
-        $this->properties();
         $this->imgSize();
 
         if (strstr($this->file["type"], 'image/')) {
