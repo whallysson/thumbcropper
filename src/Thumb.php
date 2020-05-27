@@ -15,13 +15,22 @@ namespace CodeBlog\Thumb;
  * or
  * echo $Tim->imgCreate(upload/images/imagem.png?w=250&h=500&a=b&zc=2);
  */
-class Thumb {
-
+class Thumb
+{
     /** @var string */
-    private $file;
+    private $imagePath;
 
     /** @var string */
     private $imageName;
+
+    /** @var string */
+    private $imageMime;
+
+    /** @var string */
+    private $imageInfo;
+
+    /** @var string */
+    private $file;
 
     /** @var string */
     private $url;
@@ -44,7 +53,7 @@ class Thumb {
     /** PROPERTIES */
 
     /** @var string */
-    private $wbase = 800; // Tamanho padrão da largura da imagem caso não seja setada
+    private $wbase = 800; // Default image width size if not set
 
     /** @var int */
     private $width;
@@ -67,6 +76,13 @@ class Thumb {
     private $pngCompressor = 5; // floor(95 * 0.09)
 
     /**
+     * Allow jpg and png to thumb and cache generate
+     *
+     * @var array allowed media types
+     */
+    private static $allowedExt = ['image/jpeg', "image/png"];
+
+    /**
      * Thumb constructor.
      * @param string $cacheFolder
      * @param null|string $Time
@@ -75,10 +91,10 @@ class Thumb {
      * @throws \Exception
      */
     function __construct(
-            string $cacheFolder,
-            ?string $Time = null,
-            ?int $jpgQuality = null,
-            ?int $pngCompressor = null
+        string $cacheFolder,
+        ?string $Time = null,
+        ?int $jpgQuality = null,
+        ?int $pngCompressor = null
     ) {
         $this->cacheFolder = $cacheFolder;
         $this->time = ($Time ? $Time : $this->time);
@@ -99,7 +115,8 @@ class Thumb {
      * @param string $imagePath
      * @return null|string
      */
-    public function imgCreate(string $imagePath, string $imageName = null): ?string {
+    public function imgCreate(string $imagePath): ?string
+    {
         $this->url = $imagePath;
 
         $ParseUrl = parse_url($this->url);
@@ -107,17 +124,30 @@ class Thumb {
 
         $Exp = explode('.', substr(strrchr($ParseUrl['path'], '/'), 1));
 
-        $this->imageName = strlen($Exp[0]) > 4 ? $Exp[0] : $ParseUrl['path'];
         $this->file['ext'] = (isset($Exp[1]) ? $Exp[1] : null);
+
+        if (!file_exists($ParseUrl['path'])) {
+            return "Image not found";
+        }
+
+        $this->imagePath = $ParseUrl['path'];
+        $this->imageMime = mime_content_type($this->imagePath);
+        $this->imageInfo = pathinfo($this->imagePath);
+
+        if (!in_array($this->imageMime, self::$allowedExt)) {
+            return "Not a valid JPG or PNG image";
+        }
+
+        $this->imageName = $this->name($this->imagePath);
+        if (file_exists("{$this->cacheFolder}/{$this->imageName}") && is_file("{$this->cacheFolder}/{$this->imageName}")) {
+            return "{$this->cacheFolder}/{$this->imageName}";
+        }
 
         /** If the image does not exist it creates in the image in the cache folder */
         $this->noImage();
 
         /** Clean the Cache */
         $this->cleanCache();
-
-        /** Arrow the name */
-        $this->setFileName($imageName);
 
         if (file_exists("{$this->cacheFolder}/{$this->imageName}") && is_file("{$this->cacheFolder}/{$this->imageName}")) {
             /** Return the cached image if it already exists */
@@ -138,19 +168,17 @@ class Thumb {
     /**
      * Clear cache
      *
-     * @param string|null $imageName
+     * @param string|null $imagePath
      * @example $t->flush("images/image.jpg"); clear image name and variations size
      * @example $t->flush(); clear all image cache folder
      */
-    public function flush(string $imageName = null): void {
-        $scan = scandir($this->cacheFolder);
-        $name = ($imageName ? $this->setFileName($imageName) : null);
-
-        foreach ($scan as $file) {
+    public function flush(string $imagePath = null): void
+    {
+        foreach (scandir($this->cacheFolder) as $file) {
             $file = "{$this->cacheFolder}/{$file}";
-            if ($imageName && strpos($file, $name)) {
+            if ($imagePath && strpos($file, $this->hash($imagePath))) {
                 $this->imageDestroy($file);
-            } elseif (!$imageName) {
+            } elseif (!$imagePath) {
                 $this->imageDestroy($file);
             }
         }
@@ -159,21 +187,97 @@ class Thumb {
     /**
      * @return mixed
      */
-    public function getResult() {
+    public function getResult()
+    {
         return $this->result;
     }
 
     /**
      * @return mixed
      */
-    public function getError() {
+    public function getError()
+    {
         return $this->error;
     }
 
+
+    private function existeFileCache(): void
+    {
+        $folderFileName = "{$this->cacheFolder}/cacheTime.txt";
+        if (!file_exists($folderFileName)) {
+            $SiteMapCheck = fopen($folderFileName, "w+");
+            fwrite($SiteMapCheck, date('Y-m-d'));
+            fclose($SiteMapCheck);
+        }
+    }
+
+
+    private function cleanCache(): void
+    {
+        $this->existeFileCache();
+
+        $CacheTime = "{$this->cacheFolder}/cacheTime.txt";
+        if (filemtime($CacheTime) < (time() - $this->time)) {
+            $files = glob("{$this->cacheFolder}/*");
+            if ($files) {
+                $timeAgo = time() - $this->time;
+                foreach ($files as $file) {
+                    if (filemtime($file) < $timeAgo) {
+                        unlink($file);
+                    }
+                }
+
+                clearstatcache();
+            }
+        }
+    }
+
     /**
-     *
+     * @param string $imagePatch
      */
-    private function setProps() {
+    private function imageDestroy(string $imagePatch): void
+    {
+        if (file_exists($imagePatch) && is_file($imagePatch)) {
+            unlink($imagePatch);
+        }
+    }
+
+
+    /**
+     * @param string $name
+     * @return string
+     */
+    protected function name(string $name, int $width = null, int $height = null): string
+    {
+        $filterName = filter_var(mb_strtolower(pathinfo($name)["filename"]), FILTER_SANITIZE_STRIPPED);
+        $formats = 'ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜüÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûýýþÿRr"!@#$%&*()_-+={[}]/?;:.,\\\'<>°ºª';
+        $replace = 'aaaaaaaceeeeiiiidnoooooouuuuuybsaaaaaaaceeeeiiiidnoooooouuuyybyRr                                 ';
+        $trimName = trim(strtr(utf8_decode($filterName), utf8_decode($formats), $replace));
+        $name = str_replace(["-----", "----", "---", "--"], "-", str_replace(" ", "-", $trimName));
+
+        $hash = $this->hash($this->imagePath);
+        $ext = ($this->imageMime == "image/jpeg" ? ".jpg" : ".png");
+        $widthName = ($width ? "-{$width}" : "");
+        $heightName = ($height ? "x{$height}" : "");
+
+        return "{$name}{$widthName}{$heightName}-{$hash}{$ext}";
+    }
+
+    /**
+     * @param string $path
+     * @return string
+     */
+    protected function hash(string $path): string
+    {
+        return hash("crc32", pathinfo($path)['basename']);
+    }
+
+
+    /**
+     * UPLOADER
+     */
+    private function setProps()
+    {
         $this->properties();
         $this->imgSize();
 
@@ -185,7 +289,8 @@ class Thumb {
         return null;
     }
 
-    private function noImage(string $no = null): void {
+    private function noImage(string $no = null): void
+    {
         if (empty($this->imageName) || $no) {
             $fileName = 'no_image.jpg';
             $folderFileName = "{$this->cacheFolder}/{$fileName}";
@@ -206,54 +311,9 @@ class Thumb {
         }
     }
 
-    /**
-     * @param string|null $imageName
-     */
-    private function setFileName(string $imageName = null): void {
-        $name = ($imageName ? $imageName : $this->imageName);
-        $this->imageName = $name . '-' . md5($this->file['ext'] . $this->file['query']);
-        $fileName = $this->name($this->imageName) . ".{$this->file['ext']}";
-        $this->imageName = mb_strtolower($fileName);
-    }
 
-    /**
-     *
-     */
-    private function existeFileCache(): void {
-        $folderFileName = "{$this->cacheFolder}/cacheTime.txt";
-        if (!file_exists($folderFileName)) {
-            $SiteMapCheck = fopen($folderFileName, "w+");
-            fwrite($SiteMapCheck, date('Y-m-d'));
-            fclose($SiteMapCheck);
-        }
-    }
-
-    /**
-     *
-     */
-    private function cleanCache(): void {
-        $this->existeFileCache();
-
-        $CacheTime = "{$this->cacheFolder}/cacheTime.txt";
-        if (filemtime($CacheTime) < (time() - $this->time)) {
-            $files = glob("{$this->cacheFolder}/*");
-            if ($files) {
-                $timeAgo = time() - $this->time;
-                foreach ($files as $file) {
-                    if (filemtime($file) < $timeAgo) {
-                        unlink($file);
-                    }
-                }
-
-                clearstatcache();
-            }
-        }
-    }
-
-    /**
-     *
-     */
-    private function imgSize(): void {
+    private function imgSize(): void
+    {
         $Src = (strrpos($this->url, '?') ? substr($this->url, 0, strrpos($this->url, '?')) : $this->url);
         $Tam = getimagesize($Src);
         $this->file['type'] = $Tam['mime'];
@@ -277,30 +337,19 @@ class Thumb {
         }
     }
 
-    /**
-     *
-     */
-    private function properties(): void {
+
+    private function properties(): void
+    {
         parse_str($this->file['query'], $prop);
-        $this->width = ((int) isset($prop['w']) ? $prop['w'] : null);
-        $this->height = ((int) isset($prop['h']) ? $prop['h'] : null);
-        $this->zc = ((int) isset($prop['zc']) ? $prop['zc'] : 1);
+        $this->width = ((int)isset($prop['w']) ? $prop['w'] : null);
+        $this->height = ((int)isset($prop['h']) ? $prop['h'] : null);
+        $this->zc = ((int)isset($prop['zc']) ? $prop['zc'] : 1);
         $this->a = (isset($prop['a']) ? $prop['a'] : 'c');
     }
 
-    /**
-     * @param string $imagePatch
-     */
-    private function imageDestroy(string $imagePatch): void {
-        if (file_exists($imagePatch) && is_file($imagePatch)) {
-            unlink($imagePatch);
-        }
-    }
 
-    /**
-     *
-     */
-    protected function uploadImage(): void {
+    protected function uploadImage(): void
+    {
         $Transparency = null;
         switch ($this->file['type']):
             case 'image/jpg':
@@ -405,7 +454,7 @@ class Thumb {
                 }
 
                 imagecopyresampled($NewImage, $this->image, $origin_x, $origin_y, $src_x, $src_y, $ImageX, $ImageH,
-                        $src_w, $src_h);
+                    $src_w, $src_h);
             } else {
                 imagecopyresampled($NewImage, $this->image, 0, 0, 0, 0, $ImageX, $ImageH, $x, $y);
             }
@@ -435,19 +484,4 @@ class Thumb {
             imagedestroy($NewImage);
         endif;
     }
-
-    /**
-     * @param string $name
-     * @return string
-     */
-    protected function name(string $name): string {
-        $name = filter_var(mb_strtolower($name), FILTER_SANITIZE_STRIPPED);
-        $formats = 'ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜüÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûýýþÿRr"!@#$%&*()_-+={[}]/?;:.,\\\'<>°ºª';
-        $replace = 'aaaaaaaceeeeiiiidnoooooouuuuuybsaaaaaaaceeeeiiiidnoooooouuuyybyRr                                 ';
-        $name = str_replace(["-----", "----", "---", "--"], "-",
-                str_replace(" ", "-", trim(strtr(utf8_decode($name), utf8_decode($formats), $replace))));
-
-        return $name;
-    }
-
 }
